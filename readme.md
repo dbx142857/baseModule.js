@@ -1,14 +1,17 @@
-**baseModule指令说明**
+**baseModule.js说明**
 ===================
 
 **baseController**
 -------------
 
-> -1 对于jquery对象扩展了两个方法warn和succes，一个弹出框方法，基于非常漂亮的弹出框组件swal.js
-> -2 对于以下方法会触发isUILock=true,可绑定该属性监听页面是否有任何xhr请求：
+> **参数说明**
+
+> - 1 对于jquery对象扩展了两个方法warn和succes，一个弹出框方法，基于非常漂亮的弹出框组件swal.js
+> - 2 对于以下方法会触发isUILock=true,可绑定该属性监听页面是否有任何xhr请求：
          lockButton selectedFileChange(如果选择立即上传模式) pageLoading requesting
-> -3 对于以下方法会触发isUILock=false,可绑定该属性监听页面是否有任何xhr请求：
+> - 3 对于以下方法会触发isUILock=false,可绑定该属性监听页面是否有任何xhr请求：
 pageLoaded requestEnd unlockButton formDataUpdateSuccess uploadSuccess uploadError selectedFileSizeInvalid imgSizeInvalid
+
 
 
 
