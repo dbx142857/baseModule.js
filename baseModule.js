@@ -1,16 +1,537 @@
+/*
+为页面加入动画层：
+ <body ng-app="main">
+ <div ng-show="isUILock" ng-controller="baseController" class="ui-lock-anim-wrapper">
+ <div class="ui-lock-anim" ng-include src="'/tpl/loading.html'"></div>
+ </div>
+ <script>
+ (function ($) {
+ 'use strict';
+ angular
+ .module('main', [
+ 'base'
+ ])
+ //                .service('mainService', ['$http', '$rootScope', '$q', 'baseService', 'CONFIG', function ($http, $rootScope, $q, baseService, CONFIG) {
+ //
+ //                    var bs = baseService;
+ //
+ //                    var o = {};
+ //                    return o;
+ //                }])
+ //                .controller('mainController', ['$scope', '$http', '$rootScope', '$q', 'mainService', 'baseService', 'CONFIG', function ($scope, $http, $rootScope, $q, mainService, baseService, CONFIG) {
+ //                    var ms = $scope.ms = mainService,
+ //                            bs = $scope.bs = baseService,
+ //                            cfg = $scope.CONFIG = CONFIG;
+ //
+ //
+ //                }])
+
+ })(jQuery);
+ </script>
+ <style>
+ .ui-lock-anim,.ui-lock-anim-wrapper{
+ position: fixed;
+ top: 0;
+ left: 0;
+ width: 100%;
+ height: 100%;
+ z-index: 10000000000;
+ }
+ .ui-lock-anim{
+ top: 20%;
+ }
+ </style>
+ */
 
 
-
-(function($){
+(function($,ng){
     'use strict';
+
+    var lib={
+
+
+        tpl : function(options) {
+            options = $.extend({
+                left_split : "{{",
+                right_split : "}}",
+                tpl : "",
+                data : null
+            }, options);
+            if (options.data == null) {
+                return options.tpl;
+            } else {
+                var reg = new RegExp(options.left_split + "(.+?)" + options.right_split, "gi");
+                var strs = options.tpl.match(reg), tpl = options.tpl;
+                for (var i = 0; i < strs.length; i++) {
+                    var str = strs[i];
+                    strs[i] = str.substring(options.left_split.length, str.length - (options.right_split.length));
+                    tpl = tpl.replace(str, str.indexOf(".") == -1 ? (options.data[strs[i]]||'') : (this.getDataByModel(options.data,strs[i]))||'');
+                }
+                return tpl;
+            }
+        },
+        getFormDataByMap:function(formData,map){
+            var res={};
+            for(var i in map){
+
+                res[map[i]]=formData[i];
+            }
+            return res;
+        },
+        reverseMap:function(map){
+            var res={};
+            for(var i in map){
+                res[map[i]]=i;
+            }
+            return res;
+        },
+
+        toggleArrayElement:function(item,arr){
+            var index=arr.indexOf(item);
+            if(index===-1){
+                arr.push(item);
+            }else{
+                arr.splice(index,1);
+            }
+        },
+        //检测数组重复元素
+        isRepeat:function(arr){
+
+            var hash = {};
+
+            for(var i in arr) {
+
+                if(hash[arr[i]])
+
+                    return true;
+
+                hash[arr[i]] = true;
+
+            }
+
+            return false;
+
+        },
+        //冒泡排序
+        bubbleSort:function(arr){
+            for(var i=0;i<arr.length;i++){
+                //内层循环，找到第i大的元素，并将其和第i个元素交换
+                for(var j=i;j<arr.length;j++){
+                    if(arr[i]>arr[j]){
+                        //交换两个元素的位置
+                        var temp=arr[i];
+                        arr[i]=arr[j];
+                        arr[j]=temp;
+                    }
+                }
+            }
+        },
+        parseUrl: function (href) {
+            var url = href || location.href;
+            var a = document.createElement('a');
+            a.href = url;
+            var ret = {},
+                seg = a.search.replace(/^\?/, '').split('&'),
+                len = seg.length, i = 0, s;
+            for (; i < len; i++) {
+                if (!seg[i]) {
+                    continue;
+                }
+                s = seg[i].split('=');
+                ret[s[0]] = s[1];
+            }
+            return ret;
+        },
+        //以下为增强数据模型的获取，修改和找寻目标scope的方法
+        getDataByModel:function($scope,modelStr,otherWiseVal){
+            otherWiseVal=otherWiseVal||null;
+            var arr=modelStr.split('.'),len=arr.length,result=$scope;
+            if(len===1){
+                return $scope[arr[0]];
+            }else if(len>1){
+                var isError=false;
+                for(var i in arr){
+                    if(typeof(result[arr[i]])==='undefined'){
+                        isError=true;
+                        break;
+                    }else{
+                        result=result[arr[i]];
+                    }
+                }
+                if(isError){
+                    return otherWiseVal;
+                }else{
+                    return result;
+                }
+            }else if(len===0){
+                return otherWiseVal;
+            }
+        },
+        setDataByModel:function($scope,modelStr,val){
+            var arr=modelStr.split('.'),len=arr.length;
+            if(len===1){
+                $scope[arr[0]]=val;
+            }else if(len>1){
+                var ns=arr,obj=$scope;
+                for(var i=0;i<len-1;i++){
+                    var key=ns[i];
+                    obj=obj[key];
+                }
+                obj[ns[len-1]]=val;
+            }
+        },
+        getTargetScopeByModel:function($currentScope,modelStr){
+            var arr=modelStr.split('.'),len=arr.length;
+            if(len===0){
+                return $currentScope;
+            }else{
+                var key=arr[0],$pScope=$currentScope;
+                var loop=function(){
+                    $pScope=$pScope.$parent;
+                    if($pScope===null){
+                        $pScope=null;
+                    }else{
+                        if(typeof($pScope[key])==='undefined'){
+                            loop();
+                        }
+                    }
+
+                }
+                loop();
+                return $pScope;
+            }
+        },
+        isDate:function(txtDate)
+        {
+            var currVal = txtDate;
+            if(currVal == '')
+                return false;
+
+            var rxDatePattern = /^(\d{4})(\/|-)(\d{1,2})(\/|-)(\d{1,2})$/; //Declare Regex
+            var dtArray = currVal.match(rxDatePattern); // is format OK?
+
+            if (dtArray == null)
+                return false;
+
+            //Checks for mm/dd/yyyy format.
+            var dtMonth = dtArray[3];
+            var dtDay= dtArray[5];
+            var dtYear = dtArray[1];
+
+            if (dtMonth < 1 || dtMonth > 12)
+                return false;
+            else if (dtDay < 1 || dtDay> 31)
+                return false;
+            else if ((dtMonth==4 || dtMonth==6 || dtMonth==9 || dtMonth==11) && dtDay ==31)
+                return false;
+            else if (dtMonth == 2)
+            {
+                var isleap = (dtYear % 4 == 0 && (dtYear % 100 != 0 || dtYear % 400 == 0));
+                if (dtDay> 29 || (dtDay ==29 && !isleap))
+                    return false;
+            }
+            return true;
+        },
+        filter:function(oFormData,aFilters){
+            var result={};
+            for(var i in oFormData){
+                if(aFilters.indexOf(i)!==-1){
+                    result[i]=oFormData[i];
+                }
+            }
+            return result;
+        },
+        isSequentFromNo1:function(arr){
+            var len=arr.length;
+            if(len===0){
+                return false;
+            }
+            var str='',rightStr='';
+            for(var i= 0;i<len;i++){
+                str+=arr[i];
+                rightStr+=(i+1);
+            };
+
+            return str===rightStr;
+        },
+        isDateTime:function(str,format){
+            var reg=null;
+            if(format==='y-m-d h:i:s'){
+                reg = /^(\d+)-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})$/;
+            }else if(format==='y/m/d h:i:s'){
+                reg = /^(\d+)\/(\d{1,2})\/(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})$/;
+            }else{
+                return true;
+            }
+            if(reg!==null){
+
+            }
+            //var reg = /^(\d+)-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})$/;
+            var r = str.match(reg);
+            if(r==null)return false;
+            r[2]=r[2]-1;
+            var d= new Date(r[1], r[2],r[3], r[4],r[5], r[6]);
+            if(d.getFullYear()!=r[1])return false;
+            if(d.getMonth()!=r[2])return false;
+            if(d.getDate()!=r[3])return false;
+            if(d.getHours()!=r[4])return false;
+            if(d.getMinutes()!=r[5])return false;
+            if(d.getSeconds()!=r[6])return false;
+            return true;
+        },
+        getMapByObjIndex:function(eq,obj){
+            var index=0,result={};
+            for(var i in obj){
+                if(index==eq){
+                    result.k=i;
+                    result.v=obj[i];
+                    break;
+                }
+                index++;
+            }
+            return result;
+        },
+        isNull:function(str){
+            return (typeof(str)==='string'&&str.trim()==='')||(typeof(str)==='undefined')||(str===null);
+        },
+        isExist:function(obj,modelstr){
+            var _ng={
+                isObject:function(obj){
+                    return obj===Object(obj);
+                },
+                isUndefined:function(obj){
+                    return typeof(obj)==='undefined';
+                }
+            }
+            var exist=true;
+            var arr=modelstr.split('.'),len=arr.length;
+            if(!_ng.isObject(obj)){
+                exist=false;
+            }
+            else if(obj===null){
+                exist=false;
+            }
+            else if(_ng.isUndefined(obj)){
+                exist=false;
+            }else{
+                for(var i in arr){
+                    if(_ng.isUndefined(obj[arr[i]])){
+                        exist=false;
+                        break;
+                    }
+                    obj=obj[arr[i]];
+                }
+            }
+
+            return exist;
+        },
+        //getVal:function(obj,modelstr,otherwiseVal){
+        //    var exist=this.isExist(obj,modelstr),val;
+        //    if(exist){
+        //        val=getDataByModel(obj,modelstr);
+        //    }else{
+        //        val=otherwiseVal||''
+        //    }
+        //    return val;
+        //},
+        getArrayByRepeatElement:function(obj,count){
+            var arr=[];
+            for(var i= 0;i<count;i++){
+                arr.push(obj);
+            }
+            return arr;
+        },
+        getDateStr:function(AddDayCount) {
+            var dd = new Date();
+            dd.setDate(dd.getDate()+AddDayCount);//获取AddDayCount天后的日期
+            var y = dd.getFullYear();
+            var m = dd.getMonth()+1;//获取当前月份的日期
+            var d = dd.getDate();
+            m=m<10?'0'+m:m;
+            d=d<10?'0'+d:d;
+
+            return y+"-"+m+"-"+d;
+        },
+        /*
+         节流函数
+         // Usage
+         var myEfficientFn = debounce(function() {
+         // All the taxing stuff you do
+         }, 250);
+         window.addEventListener('resize', myEfficientFn);
+         */
+        debounce:function(func, wait, immediate) {
+            var timeout;
+            return function() {
+                var context = this, args = arguments;
+                var later = function() {
+                    timeout = null;
+                    if (!immediate) func.apply(context, args);
+                };
+                var callNow = immediate && !timeout;
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+                if (callNow) func.apply(context, args);
+            };
+        },
+        /*
+         期望状态检查
+         // Usage:  ensure element is visible
+         poll(
+         function() {
+         return document.getElementById('lightbox').offsetWidth > 0;
+         },
+         function() {
+         // Done, success callback
+         },
+         function() {
+         // Error, failure callback
+         }
+         );
+         */
+        poll:function(fn, callback, errback, timeout, interval) {
+            var endTime = Number(new Date()) + (timeout || 2000);
+            interval = interval || 100;
+
+            (function p() {
+                // If the condition is met, we're done!
+                if(fn()) {
+                    callback();
+                }
+                // If the condition isn't met but the timeout hasn't elapsed, go again
+                else if (Number(new Date()) < endTime) {
+                    setTimeout(p, interval);
+                }
+                // Didn't match and too much time, reject!
+                else {
+                    errback(new Error('timed out for ' + fn + ': ' + arguments));
+                }
+            })();
+        },
+        /*
+         once函数
+         // Usage
+         var canOnlyFireOnce = once(function() {
+         console.log('Fired!');
+         });
+
+         canOnlyFireOnce(); // "Fired!"
+         canOnlyFireOnce(); // undefined
+         */
+        once:function(fn, context) {
+            var result;
+
+            return function() {
+                if(fn) {
+                    result = fn.apply(context || this, arguments);
+                    fn = null;
+                }
+
+                return result;
+            };
+        },
+        /*
+         // Usage
+         getAbsoluteUrl('/something'); // http://davidwalsh.name/something
+         */
+        getAbsoluteUrl:(function() {
+            var a;
+
+            return function(url) {
+                if(!a) a = document.createElement('a');
+                a.href = url;
+
+                return a.href;
+            };
+        })(),
+        /*
+         插入样式:
+         // Usage
+         sheet.insertRule("header { float: left; opacity: 0.8; }", 1);
+         */
+        sheet: (function() {
+            // Create the <style> tag
+            var style = document.createElement('style');
+
+            // Add a media (and/or media query) here if you'd like!
+            // style.setAttribute('media', 'screen')
+            // style.setAttribute('media', 'only screen and (max-width : 1024px)')
+
+            // WebKit hack :(
+            style.appendChild(document.createTextNode(''));
+
+            // Add the <style> element to the page
+            document.head.appendChild(style);
+
+            return style.sheet;
+        })(),
+        /*
+
+         */
+    };
+
+    
+
+    function responseSpaceAction(){
+        return {
+            restrict: 'A',
+            link: function (scope, el, attrs){
+                var service=lib.getDataByModel(scope,attrs.responseSpaceAction);
+                $(el).on('keyup',function(event){
+                    if(event.keyCode===32){
+                        service();
+                    }
+
+                })
+            }
+        };
+    }
+    function responseEnterAction(){
+        return {
+            restrict: 'A',
+            link: function (scope, el, attrs){
+                var service=lib.getDataByModel(scope,attrs.responseEnterAction);
+                $(el).on('keyup',function(event){
+                    if(event.keyCode===13){
+                        service();
+                    }
+
+                })
+            }
+        };
+    }
+
+    function responseEscAction(){
+        return {
+            restrict: 'A',
+            link: function (scope, el, attrs){
+                var service=lib.getDataByModel(scope,attrs.responseEscAction);
+                $(el).on('keyup',function(event){
+                    if(event.keyCode===27){
+                        service();
+                    }
+
+                })
+            }
+        };
+    }
+
+
     angular
         .module('base', [
-            'baseModule.templates'
+            'ngAnimate',
+
+            'baseModule.templates',
+            'ui.bootstrap'
 //                    'ui.bootstrap'
         ])
+        .directive('responseEnterAction',responseEnterAction)
+        .directive('responseEscAction',responseEscAction)
+        //.directive('responseKeyAction',responseKeyAction)
+        .directive('responseSpaceAction',responseSpaceAction)
 
         /*
-        demo:
+         demo:
          <pagination res-total-num-key="total" res-data-key="data" page-handler-num="10" page-size="10" url="/test/fetchData?page={currentPage}&pageSize={pageSize}" datamodel="obj.data" transform-res-data-fn="transformResData">
 
          </pagination>
@@ -36,11 +557,7 @@
                     var bs=$scope.bs=baseService;
 
                     var options=$scope.options={};
-                    var isNull=function(v){
-                        //var v=$scope[key];
-                        return typeof(v)==='undefined'|| v.trim()===''||v===null;
-                    }
-                    if(isNull($scope['url'])){
+                    if(baseService.isNull($scope['url'])){
                         alert('url属性是必须的');
                         return false;
                     }
@@ -58,7 +575,7 @@
 
                     for(var k in defaultOptions){
                         var v=defaultOptions[k];
-                        if(isNull($scope[k])){
+                        if(baseService.isNull($scope[k])){
                             options[k]=v;
                         }else{
                             options[k]=$scope[k];
@@ -101,20 +618,21 @@
                             .then(function(e){
                                 var data= e.data;
                                 console.log("sdfsdf-----------data:",data);
-                                if(!isNull(options.resDataKey)){
+                                if(!baseService.isNull(options.resDataKey)){
                                     var listData=bs.getDataByModel(data,options.resDataKey);
                                     if(listData!==null){
                                         allowFetch=true;
-                                        if(isNull($scope['transformResDataFn'])){
+                                        //console.log("bs.isNull($pScope['transformResDataFn']",baseService.isNull($pScope['transformResDataFn']));
+                                        if(baseService.isNull($scope['transformResDataFn'])){
                                             bs.setDataByModel($pScope,options.datamodel,listData);
                                         }
-                                        else{
+                                        else if(!baseService.isNull($pScope['transformResDataFn'])){
                                             bs.setDataByModel($pScope,options.datamodel,$scope['transformResDataFn'](listData));
                                         }
                                         var totalCount=parseInt(bs.getDataByModel(data,options.resTotalNumKey),10);
                                         $scope.totalPage=Math.ceil(totalCount/parseInt(options.pageSize,10))
                                         calculatePageRange();
-                                            $rootScope.$emit('paginationDataLoaded', e.data,$scope,options,$element);
+                                        $rootScope.$emit('paginationDataLoaded', e.data,$scope,options,$element);
                                     }
 
                                     //console.log('sfdsfsd')
@@ -160,7 +678,7 @@
             }
         }])
         /*
-        demo:
+         demo:
          <select-all-checkbox item-flag="isSelected" checkboxes="ListOfItems" is-all-selected="AllSelectedItems" is-none-selected="NoSelectedItems"></select-all-checkbox>select all
          <div ng-repeat="item in ListOfItems">
          <input type="checkbox" ng-model="item.isSelected" />{{item.desc}}
@@ -233,20 +751,206 @@
                 }
             };
         })
+        .directive('jqueryUiMultiSelect',['$rootScope','baseService',function($rootScope,baseService){
+            var makeSelect=function(attrs){
+                return '<select style="width:'+attrs.width+'" multiple="multiple" size="'+(attrs.size||5)+'"></select>';
+            }
+            return {
+                restrict:'EA',
+                //replace:true,
+                template:function($ele,attrs){
+                    //return "<div>hello world</div>";
+                    var tpl=makeSelect(attrs);
+                    console.log('jqueryUiMultiSelect的模板:',tpl);
+                    return tpl;
+                },
+                scope:{
+
+                    options:'@'
+                },
+                link:function($scope,$ele,attrs){
+
+                    //var $uiSelect=null;
+
+                    var hasInstance=false;
+                    var $select=$(makeSelect(attrs));
+                    //console.log('this is the $select:',$select.get(0));
+                    var multiselect=function(data){
+                        var allValueStr=(function(){
+                            var str='';
+                            for(var i in data){
+                                for(var j in data[i].items){
+                                    //var item=
+                                    str+=data[i].items[j].value+' ';
+                                }
+                            }
+                            return str.trim();
+                        })();
+
+
+                        var str='';
+                        for(var i in data){
+                            var item=data[i];
+                            str+='<optgroup label="'+item.labels+'">';
+                            for(var j in item.items){
+                                var subItem=item.items[j];
+                                console.log('sub item is:',subItem);
+                                str+='<option'+(subItem.selected===true?' selected="selected"':'')+'>'+subItem.value+'</option>';
+                            }
+                            str+='</optgroup>';
+                        }
+                        console.log('str is:',str,$ele);
+                        $select.html(str);
+                        //$select.get(0).innerHTML=str;
+                        //setTimeout(function(){
+                        //    console.log('select html:',$select.html())
+                        //})
+
+
+                        //return false;
+                        console.log("------select-------:",$select);
+                        if(angular.isUndefined($.fn.multiselect)){
+                            alert('jquery-ui-muti-select插件实例化失败，请检查所有相关的文件是否都已经引入，包括两个css文件和两个js文件');
+                        }else{
+                            var fn=baseService.getDataByModel($pScope,attrs.selectedChangeFn),values=[];
+                            //var toggleValue=function(value){
+                            //    var index=values.indexOf(value);
+                            //    if(index===-)
+                            //}
+                            if(!hasInstance){
+                                $ele.replaceWith($select);
+                                $select.multiselect({
+                                    noneSelectedText:'请选择',
+                                    checkAllText:'全选',
+                                    uncheckAllText:'全不选',
+                                    selectedText:'# 个项目被选中',
+                                    click: function(event, ui){
+                                        baseService.toggleArrayElement(ui.value,values);
+                                        fn(values.join(','));
+                                    },
+                                    checkAll: function(){
+                                        values=allValueStr.split(' ');
+                                        //$callback.text("Check all clicked!");
+                                        fn(values.join(','));
+                                    },
+                                    uncheckAll: function(){
+                                        values=[];
+                                        fn('');
+                                        //$callback.text("Uncheck all clicked!");
+                                    }
+                                });
+                                hasInstance=true;
+                            }
+                            else{
+                                $select.multiselect('refresh');
+                            }
+                        }
+                    }
+
+                    //console.log('--select scope:',$scope,attrs.options,$scope.$parent);
+                    var $pScope=baseService.getTargetScopeByModel($scope,attrs.options);
+
+
+                    $pScope.$watch(function(){
+                        return baseService.getDataByModel($pScope,attrs.options);
+                    },function(nv){
+
+
+                        if(angular.isArray(nv)){
+                            multiselect(nv);
+                        }
+                        //console.log('select nv is:',nv,typeof(nv), angular.isArray(nv));
+                    },true)
+                }
+                ,
+                replace:true
+            }
+        }])
+        .directive('laydate',['$rootScope','baseService',function($rootScope,baseService){
+            return {
+                restrict:'EA',
+                //replace:true,
+                template:function($ele,attrs){
+
+                    return '<input ng-model="'+attrs.ngmodel+'">';
+                },
+                scope:{
+
+                    ngmodel:'@'
+                },
+                link:function($scope,$ele,attrs){
+                    var $pScope=baseService.getTargetScopeByModel($scope,$scope.ngmodel);
+                    console.log('this is the p scope---laydate:',$pScope);
+                    var id='laydate'+parseInt(Math.random()*10000);
+                    $ele.attr({
+                        id:id
+                    }).on('mouseup keyup paste dragend',function(){
+                        baseService.setDataByModel($pScope,attrs.ngmodel,$(this).val());
+                        $pScope.$apply();
+                    });
+
+
+
+
+                    //$pScope.$watch(function(){
+                    //    return baseService.getDataByModel($pScope,attrs.ngModel)
+                    //},function(nv){
+                    //    console.log('from pscrope,nv :',nv);
+                    //    setTimeout(function(){
+                    //        $ele.get(0).value=nv;
+                    //    })
+                    //})
+                    //setTimeout(function())
+
+                    laydate({
+                        elem: '#'+id,
+                        format: 'YYYY-MM-DD',
+                        //min: laydate.now(),
+                        max: '2099-06-16',
+//            istime: true,
+                        istoday: false,
+                        choose: function(datas){
+                            console.log('this is datas:',datas);
+                            baseService.setDataByModel($pScope,attrs.ngmodel,datas);
+                            $pScope.$apply();
+                        }
+
+                    })
+
+                    var val=baseService.getDataByModel($pScope,attrs.ngmodel);
+                    setTimeout(function(){
+                        console.log('val is:',val);
+                        $ele.get(0).value=val;
+                    })
+                },
+                replace:true
+            }
+        }])
         .directive('datePicker',['$rootScope','baseService',function($rootScope,baseService){
             return {
                 restrict:'EA',
+                //replace:true,
                 template:function($ele,attrs){
 
+                    //<li><strong class="tit">{{msg}}：</strong>
+                    // </li>
+
                     var tpl=baseService.tpl({
-                        tpl:'<li><strong class="tit">{{msg}}：</strong><input onfocus="WdatePicker({dateFmt:'+'\''+attrs.format+'\''+'})" ng-focus="{{ngfocus}}" ng-model="{{ngmodel}}" type="text" class="form-control"> </li>',
+                        tpl:'<input onfocus="WdatePicker({dateFmt:'+'\''+attrs.format+'\''+'})" ng-focus="{{ngfocus}}" ng-model="{{ngmodel}}" type="text" class="form-control">',
                         data:attrs
                     });
                     console.log('tpl is:',tpl);
                     return tpl;
                 },
                 link:function($scope,$ele,attrs){
-                    $ele.find(':text').blur(function(){
+                    //$(document).click(function(e){
+                    //    var $tar=$(e.target);
+                    //    console.log('is WdayTable:',$tar.closest('.WdayTable').size())
+                    //    if($tar.closest('.WdayTable').size()){
+                    //        $ele.blur();
+                    //    }
+                    //})
+                    $ele.blur(function(){
                         baseService.setDataByModel($scope,attrs.ngmodel,$(this).val());
                         $scope.$apply();
                     })
@@ -273,6 +977,42 @@
                 replace:true
             }
         }])
+        .directive('noneSelectMsg',['$rootScope','baseService',function($rootScope,baseService){
+            return {
+                restrict:'A',
+                link:function($scope,$ele,attrs){
+                    console.log("ele is:",$ele,attrs);
+                    var nodeName=$ele.get(0).nodeName.toLowerCase();
+                    if(nodeName==='select'&&attrs.ngModel){
+                        //var $pScope=baseService.getTargetScopeByModel($scope,$scope.ngModel);
+                        $scope.$watch(function(){
+                            return baseService.getDataByModel($scope,attrs.ngModel);
+                        },function(nv){
+                            if(nv===null||typeof(nv)==='undefined'||nv.trim()===''){
+                                $ele.children().first().html(attrs.noneSelectMsg||'请选择');
+                            }
+                            //setTimeout(function(){
+                            //    $s1.children().first().html()===''&&$s1.children().first().html('请选择');
+                            //    $s2.children().first().html()===''&&$s2.children().first().html('请选择');
+                            //    $s3.children().first().html()===''&&$s3.children().first().html('请选择');
+                            //})
+                        })
+                    }
+                    //$ele.find('input[type=number]').get(0).value=attrs.number;
+                    //console.log('number size:',$ele.find('input[type=number]').size());
+                }
+                //template:function($ele,attrs){
+                //    //console.log('attrs is:',attrs);
+                //    var tpl=baseService.tpl({
+                //        tpl:'<li><strong class="tit">{{msg}}：</strong><input value="{{value}}" ng-model="{{ngmodel}}" type="number" class="form-control"> </li>',
+                //        data:attrs
+                //    });
+                //
+                //    return tpl;
+                //},
+                //replace:true
+            }
+        }])
         .directive('number',['$rootScope','baseService',function($rootScope,baseService){
             return {
                 restrict:'EA',
@@ -292,7 +1032,7 @@
                 replace:true
             }
         }])
-        .directive('debuger',['$rootScope','baseService',function($rootScope,baseService){
+            .directive('debuger',['$rootScope','baseService',function($rootScope,baseService){
             return {
                 restrict:'EA',
                 template:'<div><pre style="display:block;position:fixed;left:0;top:0;white-space:normal;max-height:400px;overflow:scroll;"></pre><div></div></div>',
@@ -333,14 +1073,15 @@
             return {
                 restrict:'EA',
                 template:function($ele,attrs){
-                   //console.log('attrs is:',attrs);
+                    //console.log('attrs is:',attrs);
                     var tpl=baseService.tpl({
-                        tpl:'<li><strong class="tit">{{msg}}：</strong><input ng-focus="{{ngfocus}}" ng-model="{{ngmodel}}" type="text" class="form-control"> </li>',
+                        tpl:'<li><strong class="tit">{{msg}}：</strong><input placeholder="{{placeholder}}" ng-focus="{{ngfocus}}" ng-model="{{ngmodel}}" type="text" class="form-control"><span ng-transclude></span> </li>',
                         data:attrs
                     });
                     return tpl;
                 },
-                replace:true
+                replace:true,
+                transclude:true
                 //,
                 //link:function($scope,$ele,attrs){
                 //    if(typeof(attrs.disabled!=='undefined')){
@@ -399,11 +1140,7 @@
                     var uploaderIndex=$scope.uploaderIndex=$rootScope.uploaderIndex;//当前directive的实例的索引
 
                     var options={};
-                    var isNull=function(v){
-                        //var v=$scope[key];
-                        return typeof(v)==='undefined'|| v.trim()===''||v===null;
-                    }
-                    if(isNull($scope['url'])){
+                    if(baseService.isNull($scope['url'])){
                         alert('url属性是必须的');
                         return false;
                     }
@@ -422,7 +1159,7 @@
                     }
                     for(var k in defaultOptions){
                         var v=defaultOptions[k];
-                        if(isNull($scope[k])){
+                        if(baseService.isNull($scope[k])){
                             options[k]=v;
                         }else{
                             options[k]=$scope[k];
@@ -485,6 +1222,7 @@
 
                     }
                     $file.on('change',function(){
+                        $rootScope.$emit('selectedFileChange',$scope,options,$element);
                         var files=$file.get(0).files,len=files.length;
                         if(len===0){
                             return false;
@@ -694,7 +1432,7 @@
                                     if(options.responseDataReader!==''){
                                         var excelReader=bs.getDataByModel($pScope,options.responseDataReader);
                                         if($pScope!==null){
-                                            bs.setDataByModel($pScope,options.srcmodel,excelReader(res));
+                                            bs.setDataByModel($pScope,options.srcmodel,excelReader(res,bs.getDataByModel($pScope,options.srcmodel)));
                                         }
                                         //console.log('excelReader is:',excelReader);
                                     }
@@ -719,8 +1457,21 @@
         }])
         .service('baseService',['$http','$rootScope','$q',function($http,$rootScope,$q){
 
-            var o={
-
+            var o= $.extend(lib,{
+                locker:function($this){
+                    return {
+                        isLocked:ng.isUndefined($this.data('isLocked'))?false:($this.data('isLocked')),
+                        lock:function(){
+                            $this.data('isLocked',true);
+                            $rootScope.$emit('lockButton',$this);
+                        },
+                        unlock:function(){
+                            $this.data('isLocked',false);
+                            console.log('unlock---------------')
+                            $rootScope.$emit('unlockButton',$this);
+                        }
+                    }
+                },
                 multiHttp:function(aRequests,cb){
                     var _this=this;
                     var dataArr=[],len=aRequests.length,index=0;
@@ -735,250 +1486,9 @@
                                 }
                             })
                     })
-                },
-                log:function(){
-                    console.log(arguments);
-                },
-                tpl : function(options) {
-                    options = $.extend({
-                        left_split : "{{",
-                        right_split : "}}",
-                        tpl : "",
-                        data : null
-                    }, options);
-                    if (options.data == null) {
-                        return options.tpl;
-                    } else {
-                        var reg = new RegExp(options.left_split + "(.+?)" + options.right_split, "gi");
-                        var strs = options.tpl.match(reg), tpl = options.tpl;
-                        for (var i = 0; i < strs.length; i++) {
-                            var str = strs[i];
-                            strs[i] = str.substring(options.left_split.length, str.length - (options.right_split.length));
-                            tpl = tpl.replace(str, str.indexOf(".") == -1 ? (options.data[strs[i]]) : (this.getDataByModel(options.data,strs[i])));
-                        }
-                        return tpl;
-                    }
-                },
-                getFormDataByMap:function(formData,map){
-                    var res={};
-                    for(var i in map){
-
-                        res[map[i]]=formData[i];
-                    }
-                    return res;
-                },
-                reverseMap:function(map){
-                  var res={};
-                    for(var i in map){
-                        res[map[i]]=i;
-                    }
-                    return res;
-                },
-                locker:function($this){
-                    return {
-                        isLocked:_.isUndefined($this.data('isLocked'))?false:($this.data('isLocked')),
-                        lock:function(){
-                            $this.data('isLocked',true);
-                            $rootScope.$emit('lockButton',$this);
-                        },
-                        unlock:function(){
-                            $this.data('isLocked',false);
-                            $rootScope.$emit('unlockButton',$this);
-                        }
-                    }
-                },
-                toggleArrayElement:function(item,arr){
-                    var index=arr.indexOf(item);
-                    if(index===-1){
-                        arr.push(item);
-                    }else{
-                        arr.splice(index,1);
-                    }
-                },
-                //检测数组重复元素
-                isRepeat:function(arr){
-
-                    var hash = {};
-
-                    for(var i in arr) {
-
-                        if(hash[arr[i]])
-
-                            return true;
-
-                        hash[arr[i]] = true;
-
-                    }
-
-                    return false;
-
-                },
-                //冒泡排序
-                bubbleSort:function(arr){
-                    for(var i=0;i<arr.length;i++){
-                        //内层循环，找到第i大的元素，并将其和第i个元素交换
-                        for(var j=i;j<arr.length;j++){
-                            if(arr[i]>arr[j]){
-                                //交换两个元素的位置
-                                var temp=arr[i];
-                                arr[i]=arr[j];
-                                arr[j]=temp;
-                            }
-                        }
-                    }
-                },
-                parseUrl: function (href) {
-                    var url = href || location.href;
-                    var a = document.createElement('a');
-                    a.href = url;
-                    var ret = {},
-                        seg = a.search.replace(/^\?/, '').split('&'),
-                        len = seg.length, i = 0, s;
-                    for (; i < len; i++) {
-                        if (!seg[i]) {
-                            continue;
-                        }
-                        s = seg[i].split('=');
-                        ret[s[0]] = s[1];
-                    }
-                    return ret;
-                },
-                //以下为增强数据模型的获取，修改和找寻目标scope的方法
-                getDataByModel:function($scope,modelStr){
-                    var arr=modelStr.split('.'),len=arr.length,result=$scope;
-                    if(len===1){
-                        return $scope[arr[0]];
-                    }else if(len>1){
-                        var isError=false;
-                        for(var i in arr){
-                            if(typeof(result[arr[i]])==='undefined'){
-                                isError=true;
-                                break;
-                            }else{
-                                result=result[arr[i]];
-                            }
-                        }
-                        if(isError){
-                            return null;
-                        }else{
-                            return result;
-                        }
-                    }else if(len===0){
-                        return null;
-                    }
-                },
-                setDataByModel:function($scope,modelStr,val){
-                    var arr=modelStr.split('.'),len=arr.length;
-                    if(len===1){
-                        $scope[arr[0]]=val;
-                    }else if(len>1){
-                        var ns=arr,obj=$scope;
-                        for(var i=0;i<len-1;i++){
-                            var key=ns[i];
-                            obj=obj[key];
-                        }
-                        obj[ns[len-1]]=val;
-                    }
-                },
-                getTargetScopeByModel:function($currentScope,modelStr){
-                    var arr=modelStr.split('.'),len=arr.length;
-                    if(len===0){
-                        return $currentScope;
-                    }else{
-                        var key=arr[0],$pScope=$currentScope;
-                        var loop=function(){
-                            $pScope=$pScope.$parent;
-                            if($pScope===null){
-                                $pScope=null;
-                            }else{
-                                if(typeof($pScope[key])==='undefined'){
-                                    loop();
-                                }
-                            }
-
-                        }
-                        loop();
-                        return $pScope;
-                    }
-                },
-                isDate:function(txtDate)
-                {
-                    var currVal = txtDate;
-                    if(currVal == '')
-                        return false;
-
-                    var rxDatePattern = /^(\d{4})(\/|-)(\d{1,2})(\/|-)(\d{1,2})$/; //Declare Regex
-                    var dtArray = currVal.match(rxDatePattern); // is format OK?
-
-                    if (dtArray == null)
-                        return false;
-
-                    //Checks for mm/dd/yyyy format.
-                    var dtMonth = dtArray[3];
-                    var dtDay= dtArray[5];
-                    var dtYear = dtArray[1];
-
-                    if (dtMonth < 1 || dtMonth > 12)
-                        return false;
-                    else if (dtDay < 1 || dtDay> 31)
-                        return false;
-                    else if ((dtMonth==4 || dtMonth==6 || dtMonth==9 || dtMonth==11) && dtDay ==31)
-                        return false;
-                    else if (dtMonth == 2)
-                    {
-                        var isleap = (dtYear % 4 == 0 && (dtYear % 100 != 0 || dtYear % 400 == 0));
-                        if (dtDay> 29 || (dtDay ==29 && !isleap))
-                            return false;
-                    }
-                    return true;
-                },
-                filter:function(oFormData,aFilters){
-                    var result={};
-                    for(var i in oFormData){
-                        if(aFilters.indexOf(i)!==-1){
-                            result[i]=oFormData[i];
-                        }
-                    }
-                    return result;
-                },
-                isDateTime:function(str,format){
-                    var reg=null;
-                    if(format==='y-m-d h:i:s'){
-                        reg = /^(\d+)-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})$/;
-                    }else if(format==='y/m/d h:i:s'){
-                        reg = /^(\d+)\/(\d{1,2})\/(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})$/;
-                    }else{
-                        return true;
-                    }
-                    if(reg!==null){
-
-                    }
-                    //var reg = /^(\d+)-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})$/;
-                    var r = str.match(reg);
-                    if(r==null)return false;
-                    r[2]=r[2]-1;
-                    var d= new Date(r[1], r[2],r[3], r[4],r[5], r[6]);
-                    if(d.getFullYear()!=r[1])return false;
-                    if(d.getMonth()!=r[2])return false;
-                    if(d.getDate()!=r[3])return false;
-                    if(d.getHours()!=r[4])return false;
-                    if(d.getMinutes()!=r[5])return false;
-                    if(d.getSeconds()!=r[6])return false;
-                    return true;
-                },
-                getMapByObjIndex:function(eq,obj){
-                    var index=0,result={};
-                    for(var i in obj){
-                        if(index==eq){
-                            result.k=i;
-                            result.v=obj[i];
-                            break;
-                        }
-                        index++;
-                    }
-                    return result;
                 }
-        };
+            })
+            //var o=;
             return o;
         }])
 
@@ -1154,6 +1664,109 @@
             }
         }])
 
+        .controller('baseController',['$scope','$http','$rootScope','$q','baseService','CONFIG',function($scope,$http,$rootScope,$q,baseService,CONFIG){
+            var bs=$scope.bs=baseService,
+                cfg=$scope.CONFIG=CONFIG;
+
+            $.extend({
+                warn: function (err,fn) {
+
+                    var errStr;
+                    if(ng.isString(err)){
+                        errStr=err;
+                    }
+                    else if(ng.isArray(err)){
+                        errStr=err.join('\n');
+                    }else if(ng.isObject(err)){
+                        if(!ng.isUndefined(err.errMsg)){
+                            errStr=err.errMsg;
+                        }
+                        else if(!ng.isUndefined(err.errCode)){
+                            errStr=err.errCode;
+                        }else{
+                            errStr='系统繁忙，请稍后再试';
+                        }
+                    }
+
+                    swal({
+                        title: "发生了一些错误",
+                        text: errStr,
+                        type: "warning",
+                        showCancelButton: false,
+                        confirmButtonColor: "#DD6B55",
+                        confirmButtonText: "确定"
+                    }, function () {
+                        if(fn){
+                            fn();
+                        }
+                    });
+                },
+                success: function (msg,fn) {
+                    swal({
+                        title: msg,
+                        type: "success",
+                        showCancelButton: false,
+                        confirmButtonColor: "rgb(174, 222, 244)",
+                        confirmButtonText: "确定"
+                    }, function () {
+                        if(fn){
+                            fn();
+                        }
+                    });
+                    $rootScope.$emit('formDataUpdateSuccess');
+                }
+            })
+
+
+            $scope.isUILock=false;
+            $rootScope.$on('lockButton',function(){
+                $scope.isUILock=true;
+            })
+            $rootScope.$on('selectedFileChange',function(){
+                $scope.isUILock=true;
+            })
+            $rootScope.$on('pageLoading',function(){
+                $scope.isUILock=true;
+            })
+            $rootScope.$on('pageLoaded',function(){
+                $scope.isUILock=false;
+                $rootScope.isPageLoaded=true;
+            })
+            $rootScope.$on('requesting',function(){
+                $scope.isUILock=true;
+            })
+            $rootScope.$on('requestEnd',function(){
+                $scope.isUILock=false;
+            })
+
+
+
+            $rootScope.$on('unlockButton',function(){
+                $scope.isUILock=false;
+            })
+            $rootScope.$on('formDataUpdateSuccess',function(){
+                $scope.isUILock=false;
+            })
+            $rootScope.$on('uploadSuccess',function(){
+                $scope.isUILock=false;
+            })
+            $rootScope.$on('uploadError',function(){
+                $scope.isUILock=false;
+            })
+            $rootScope.$on('selectedFileSizeInvalid',function(){
+                $scope.isUILock=false;
+            })
+            $rootScope.$on('imgSizeInvalid',function(){
+                $scope.isUILock=false;
+            })
+
+
+            $scope.$watch('isUILock',function(nv){
+                console.log('ui锁,nv is:',nv);
+            })
+
+
+        }])
 
 
 
@@ -1162,4 +1775,5 @@
 
 
 
-})(jQuery);
+
+})(jQuery,angular);
