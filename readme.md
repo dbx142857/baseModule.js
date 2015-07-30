@@ -240,9 +240,7 @@ auto="{{CONFIG.UPLOADER.AUTO}}">
 
 
 
-> **补充说明**
->
-> - 指令独立作用域内置属性可用{name}的属性访问到，比如demo中url的值为"/test/fetchData?page={currentPage}&pageSize={pageSize}" ，其中**currentPage**表示当前页数（从第1页到最后一页，不存在第0页），**pageSize**表示每页数据条目数量
+
 
 > **事件说明**
 >
